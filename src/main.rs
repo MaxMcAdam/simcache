@@ -1,9 +1,13 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 use std::time::{Duration, Instant};
 
+/// accessed objects are pushed onto the back of the access_order queue
+/// therefore the oldest items are at the front
 pub struct Simcache<K, V> {
     store: HashMap<K, (V, Option<Instant>)>,
+    access_order: VecDeque<K>,
+    max_capacity: usize,
 }
 
 impl<K, V> Simcache<K, V> 
@@ -12,26 +16,49 @@ where
     V: Clone,
     {
         /// return a new, empty cache
-        pub fn new() -> Self {
+        pub fn new(max_capacity: usize) -> Self {
             Simcache {
                 store: HashMap::new(),
+                access_order: VecDeque::new(),
+                max_capacity,
             }
         }
 
         /// return a new, empty cache with the specified capacity
-        pub fn new_with_capacity(capacity: usize) -> Self {
+        pub fn new_with_capacity(capacity: usize, max_capacity: usize) -> Self {
             Simcache {
                 store: HashMap::with_capacity(capacity),
+                access_order: VecDeque::new(),
+                max_capacity,
             }
         }
 
         /// insert a key value pair into the cache
         /// option to include a ttl for the item
         pub fn insert(&mut self, key: K, value: V, ttl: Option<Duration>) {
-            match ttl {
-                Some(x) => {self.store.insert(key, (value, Some(Instant::now() + x)));},
-                None => {self.store.insert(key, (value, None));}
+            if self.len() > self.max_capacity - 1 && self.get(&key).is_none() {
+                self.remove_oldest();
             }
+            match ttl {
+                Some(x) => {self.store.insert(key.clone(), (value, Some(Instant::now() + x)));},
+                None => {self.store.insert(key.clone(), (value, None));}
+            }
+            self.remove_from_access_order(&key);
+            self.access_order.push_back(key);
+        }
+
+        /// return true if the given key is present in the access_order queue already, false otherwise
+        fn remove_from_access_order(&mut self, key: &K) {
+            if let Some(pos) = self.access_order.iter().position(|k| k == key) {
+                self.access_order.remove(pos);
+            }
+        }
+
+        /// remove the key:value pair from the cache that was least recently used
+        pub fn remove_oldest(&mut self) {
+            let oldest_key = self.access_order.pop_front().unwrap();
+
+            self.remove(&oldest_key);
         }
 
         /// return the value of the given key from the cache if it is not expired
@@ -64,6 +91,7 @@ where
 
         /// remove the key value pair with the given key from the cache
         pub fn remove(&mut self, key: &K) -> Option<V> {
+            self.remove_from_access_order(key);
             self.store.remove(key).map(|(value, _)| value)
         }
 
@@ -74,13 +102,15 @@ where
     }
 
     fn main() {
-        let mut cache = Simcache::new();
+        let mut cache = Simcache::new(2);
 
         cache.insert("key1", "val1", None);
         cache.insert("key2", "val2", Some(Duration::from_secs(3)));
+        cache.insert("key3", "val3", None);
 
         println!("key1: {:?}", cache.get(&"key1"));
         println!("key2: {:?}", cache.get(&"key2"));
+        println!("key3: {:?}", cache.get(&"key3"));
 
         std::thread::sleep(Duration::from_secs(4));
 
