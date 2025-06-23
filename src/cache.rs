@@ -1,6 +1,7 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap};
 use std::hash::Hash;
 use std::time::{Duration, Instant};
+use crate::EvictionPolicy;
 
 /// accessed objects are pushed onto the back of the access_order queue
 /// therefore the oldest items are at the front
@@ -88,46 +89,4 @@ where
         pub fn len(&self) -> usize {
             return self.store.len()
         }
-    }
-
-trait EvictionPolicy<K> {
-    fn evict_next(&mut self) -> K;
-    fn key_used(&mut self, key: &K);
-    fn remove_key(&mut self, key: &K);
-    fn new() -> Self;
-}
-
-struct LRU<K> {access_order: VecDeque<K>}
-
-impl<K: PartialEq + Clone> EvictionPolicy<K> for LRU<K> {
-    fn evict_next(&mut self) -> K {
-        return self.access_order.pop_front().expect("there should be at least one element in the eviction queue")
-    }
-    fn key_used(&mut self, key: &K) {
-        self.remove_key(key);
-        self.access_order.push_back(key.clone());
-    }
-    fn remove_key(&mut self, key: &K) {
-        if let Some(pos) = self.access_order.iter().position(|k| k == key) {
-            self.access_order.remove(pos);
-        }
-    }
-    fn new() -> Self {
-        return LRU{access_order: VecDeque::new()}
-    }
-}
-
-    fn main() {
-        let mut cache: Simcache::<&'static str, &'static str, LRU<&'static str>> = Simcache::new(2);
-
-        cache.insert("key1", "val1", None);
-        cache.insert("key2", "val2", Some(Duration::from_secs(33)));
-
-        println!("key1: {:?}", cache.get(&"key1"));
-        cache.insert("key4", "val4", None);
-        println!("key2: {:?}", cache.get(&"key2"));
-        println!("key3: {:?}", cache.get(&"key3"));
-
-        // std::thread::sleep(Duration::from_secs(4));
-        println!("After adding 4 - key1: {:?}", cache.get(&"key1"));
     }
