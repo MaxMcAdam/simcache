@@ -42,7 +42,9 @@ where
         /// option to include a ttl for the item
         pub fn insert(&mut self, key: K, value: V, ttl: Option<Duration>) {
             if self.store.len() > self.max_capacity - 1 && self.get(&key).is_none() {
-                self.eviction_policy.evict_next();
+                println!("Evicting");
+                let key_to_evict = self.eviction_policy.evict_next();
+                self.remove(&key_to_evict);
             }
             match ttl {
                 Some(x) => {self.store.insert(key.clone(), (value, Some(Instant::now() + x)));},
@@ -76,12 +78,13 @@ where
                 return None;
             }
 
+            self.eviction_policy.key_used(&key);
             return self.store.get(key).map(|(val, _)| val)
         }
 
         /// remove the key value pair with the given key from the cache
         pub fn remove(&mut self, key: &K) -> Option<V> {
-            self.eviction_policy.remove_key(key);
+            // self.eviction_policy.remove_key(key);
             self.store.remove(key).map(|(value, _)| value)
         }
 
