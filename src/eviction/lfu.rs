@@ -81,10 +81,44 @@ impl<K: Clone + Eq + std::hash::Hash>EvictionPolicy<K> for LFU<K> {
     }
 
     fn remove_key(&mut self, key: &K) {
+        let res = self.usage_counter.remove_entry(key);
+        if res.is_none() {
+            return
+        }
+        let (_, v) = res.expect("result should not be empty");
+        let h_set = self.count_to_key.get_mut(&v).expect("key should be in tree");
+        h_set.remove(key);
 
+        // Clean up empty count buckets
+        if h_set.is_empty() {
+            self.count_to_key.remove(&v);
+        }
     }
 
     fn new() -> Self {
         return LFU{usage_counter: HashMap::new(), count_to_key: BTreeMap::new()}
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lfu_test() {
+        let mut policy = LFU::new();
+
+        policy.key_used(&"key1");
+        policy.key_used(&"key2");
+        policy.key_used(&"key2");
+        policy.key_used(&"key3");
+        policy.key_used(&"key3");
+
+        assert!(policy.evict_next() == "key1");
+
+        policy.remove_key(&"key2");
+
+        assert!(policy.evict_next() == "key3");
     }
 }

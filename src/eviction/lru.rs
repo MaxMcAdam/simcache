@@ -20,3 +20,24 @@ impl<K: PartialEq + Clone> EvictionPolicy<K> for LRU<K> {
         return LRU{access_order: VecDeque::new()}
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lru_test() {
+        let mut policy = LRU::new();
+
+        policy.key_used(&"a");
+        policy.key_used(&"b");
+        policy.key_used(&"c");
+        policy.key_used(&"a");
+
+        assert!(policy.evict_next() == "b");
+
+        policy.remove_key(&"c");
+
+        assert!(policy.evict_next() == "a");
+    }
+}

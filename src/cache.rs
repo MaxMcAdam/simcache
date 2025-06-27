@@ -93,3 +93,58 @@ where
             return self.store.len()
         }
     }
+
+
+    #[cfg(test)]
+    mod common {
+        use super::*;
+        use super::super::eviction::*;
+
+        #[test]
+        fn test_cache_lru() {
+            let mut cache: Simcache::<&'static str, &'static str, LRU<&'static str>> = Simcache::new(3);
+
+            cache.insert("a", "1", None);
+            cache.insert("b", "2", None);
+            cache.insert("c", "3", None);
+
+            assert_eq!(cache.len(), 3);
+
+            cache.insert("d", "4", None);
+
+            assert_eq!(cache.get(&"a"), None);
+
+            assert_eq!(*(cache.get(&"b").expect("cache should have a value for key b")), "2");
+
+            cache.insert("e","5", None);
+
+            cache.remove(&"b");
+
+            assert_eq!(cache.len(), 2);
+        }
+
+        #[test]
+        fn test_cache_lfu() {
+            let mut cache: Simcache::<&'static str, &'static str, LFU<&'static str>> = Simcache::new(3);
+
+            cache.insert("a", "1", None);
+            cache.insert("b", "2", None);
+            cache.insert("c", "3", None);
+            cache.get(&"a");
+            cache.get(&"c");
+
+            assert_eq!(cache.len(), 3);
+
+            cache.insert("d", "4", None);
+
+            assert_eq!(cache.get(&"b"), None);
+
+            assert_eq!(*(cache.get(&"a").expect("cache should have a value for key a")), "1");
+
+            cache.insert("e","5", None);
+
+            cache.remove(&"a");
+
+            assert_eq!(cache.len(), 2);
+        }
+    }
